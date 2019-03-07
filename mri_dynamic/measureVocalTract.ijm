@@ -140,13 +140,20 @@ macro "MRI Labeling [f10]" {
 
 //d jaw protrusion: the distance between the lower front edge of the mandible and the mucosal cover of the spine at a 90-degree angle
 //TODO how to deal with line?
+  //find x value of laryngopharynx line at y value of mandible point
+  makeLine(x1, y1, x2, y2); //make line from mandible point to laryngopharynx line
+  d = //length of line from mandible point to laryngopharynx line 
+  Roi.getCoordinates(xpoints, ypoints) //use to find intersection...
+  Roi.contains(x, y) //use to see if the roi contains a set of points or selectionContains(x, y)
+  beta = //angle between line from mandible point to laryngopharynx line
+//jaw protrusion length = d * sin(beta)
   jaw_protrusion = 0;
   
 //e oropharynx width: pharynx width measured as the shortest distance between the posterior contour of the tongue, and the mucosal cover of the spine
   oropharynx_width = 0;
 
 //f uvula elevation: the distance between a line extending the upper contour of the hard palate and a parallel line tangent to the lowermost part of the uvula contour
-  uvula_elevation = 0;
+  uvula_elevation = abs(hard_palate_xy[1]-uvula_xy[1]);
 
 //An auxiliary line (A) was drawn for the measurement of the larynx position and laryngeal tilting. This auxiliary line connects the cranial-most part of the dens axis and the caudo-anterior edge of the sixth vertebra.
   makeLine(densaxis_xy[0], densaxis_xy[1], vertebra_xy[0], vertebra_xy[1]);
