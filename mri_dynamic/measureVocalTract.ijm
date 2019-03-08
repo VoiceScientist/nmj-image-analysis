@@ -60,7 +60,7 @@ macro "MRI Labeling [f10]" {
 
 //7d. Posterior wall of the laryngopharynx (line)
   setTool("line");
-  waitForUser('Selection Required','Draw a line along the posterior wall of the laryngopharynx, then click OK');
+  waitForUser('Selection Required','Draw a line along the posterior wall of the laryngopharynx from top to bottom extending below the level of the mandible, then click OK');
   laryngopharynx_xy = nameGetXY("laryngopharynx");
 
 //8e. Posterior contour of the tongue (contour)
@@ -119,9 +119,6 @@ macro "MRI Labeling [f10]" {
 
 //add image name to output
   print("["+totalResults+"]", currImage + ",");
-	
-//create a text file to store measurements
-//TODO
 
 //Calculate dimensions based on ROI points
 //a lip opening: distance between the lips
@@ -140,14 +137,34 @@ macro "MRI Labeling [f10]" {
 
 //d jaw protrusion: the distance between the lower front edge of the mandible and the mucosal cover of the spine at a 90-degree angle
 //TODO how to deal with line?
+  roiManager("Select", "laryngopharynx");
+  Roi.getCoordinates(xpoints, ypoints);
+  //reverse array if drawn wrong direction TODO
+  d.x = xpoints[0];
+  d.y = ypoints[0];
+  i = 1;
+  while (d.y < front_mandible_xy[1]) {
+    d.x = xpoints[i];
+    d.y = ypoints[i];
+    i++;
+  }
+    
   //find x value of laryngopharynx line at y value of mandible point
-  makeLine(x1, y1, x2, y2); //make line from mandible point to laryngopharynx line
-  d = //length of line from mandible point to laryngopharynx line 
-  Roi.getCoordinates(xpoints, ypoints) //use to find intersection...
-  Roi.contains(x, y) //use to see if the roi contains a set of points or selectionContains(x, y)
+  makeLine(front_mandible_xy[0], front_mandible_xy[1], d.x, d.y); //make line from mandible point to laryngopharynx line
+  roiManager("Add");
+  roiManager("Rename", "mandToLaryngopharynx");
+  run("Measure");
+  //length of line from mandible point to laryngopharynx line
+  d = (getResult("Length", nResults-1);
+  
   beta = //angle between line from mandible point to laryngopharynx line
+  roiManager("Select", "laryngopharynx");
+  run("Measure");
+  beta = (getResult("Angle", nResults-1);
+  //TODO check if angle is negative or correct
+  
 //jaw protrusion length = d * sin(beta)
-  jaw_protrusion = 0;
+  jaw_protrusion = d * sin(beta);
   
 //e oropharynx width: pharynx width measured as the shortest distance between the posterior contour of the tongue, and the mucosal cover of the spine
   oropharynx_width = 0;
