@@ -7,6 +7,8 @@ macro "MRI Labeling [f10]" {
 //set up variables and directories
   sourceAVI = getImageID();
   currentDirectory = getDirectory("image");
+  timeStamp = getInfo("slice.label");
+  sliceNumber = getSliceNumber();
   imageName = getTitle();
   imageNameArray = split(imageName, "_");
 //avi filename format is "liveview_MIDID09_Task2_ScanD.dat_video.avi"
@@ -21,7 +23,8 @@ macro "MRI Labeling [f10]" {
 }
 
 //Duplicate current frame
-  currImage = task+"_"+subjectid+"_"+scan;
+  currImage = task+"_"+subjectid+"_"+scan+"_Slice"
+				+sliceNumber+"_Time+"timeStamp";
   run("Duplicate...", "title="+currImage);
 
 // ensure no selections are initially made
