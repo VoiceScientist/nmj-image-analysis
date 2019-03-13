@@ -128,57 +128,78 @@ macro "MRI Labeling [f10]" {
 //Calculate distance based on points (using the Pythagorean theorem!)
 //lip_opening = lengthFromPoints(superior_lip_xy, inferior_lip_xy); //not doing - want difference in y only
   lip_opening = abs(superior_lip_xy[1] - inferior_lip_xy[1]);
-  print("["+totalResults+"]", lip_opening + ",");
 
 //b jaw opening: jaw opening, defined as the distance between the spina of the upper jaw and the lower front edge of the mandible
   jaw_opening = lengthFromPoints(spina_xy, front_mandible_xy);
-  print("["+totalResults+"]", jaw_opening + ",");
 
 //c tongue dorsum: defined as the maximum distance from a line touching the lower contour of the mandible and up to the highest cranial point of the tongue contour
 //TODO how to deal with line?
-  tongue_dorsum = 0;
+  //superior_mandible_xy (line) and tongue_highest_xy (point)
+  tongue_dorsum = superior_mandible_xy[0] - tongue_highest_xy[0]; //this seems too simple; what if mandible line is not horizontal?
 
 //d jaw protrusion: the distance between the lower front edge of the mandible and the mucosal cover of the spine at a 90-degree angle
-//TODO how to deal with line?
+  //find x value of laryngopharynx line at y value of mandible point
   roiManager("Select", "laryngopharynx");
-  Roi.getCoordinates(xpoints, ypoints);
+  Roi.getCoordinates(xpoints_lp, ypoints_lp);
   //reverse array if drawn wrong direction TODO
-  d.x = xpoints[0];
-  d.y = ypoints[0];
+  d.x = xpoints_lp[0];
+  d.y = ypoints_lp[0];
   i = 1;
   while (d.y < front_mandible_xy[1]) {
-    d.x = xpoints[i];
-    d.y = ypoints[i];
+    d.x = xpoints_lp[i];
+    d.y = ypoints_lp[i];
     i++;
+  //Error handling
+    if(i == xpoints.length); {
+      //redraw line and reset i =1
+      setTool("line");
+      waitForUser('Selection Required','Draw a line along the posterior wall of the laryngopharynx from top to bottom EXTENDING BELOW THE LEVEL OF THE MANDIBLE, then click OK');
+      laryngopharynx_xy = nameGetXY("laryngopharynx");
+      Roi.getCoordinates(xpoints_lp, ypoints_lp);
+      //reverse array if drawn wrong direction TODO
+      i = 1;
+    }
   }
-    
-  //find x value of laryngopharynx line at y value of mandible point
-  makeLine(front_mandible_xy[0], front_mandible_xy[1], d.x, d.y); //make line from mandible point to laryngopharynx line
+  
+  //draw line from front of mandible to laryngopharynx line
+  makeLine(front_mandible_xy[0], front_mandible_xy[1], d.x, d.y);
   roiManager("Add");
   roiManager("Rename", "mandToLaryngopharynx");
   run("Measure");
-  //length of line from mandible point to laryngopharynx line
+  //d = length of line from mandible point to laryngopharynx line
   d = (getResult("Length", nResults-1);
   
-  beta = //angle between line from mandible point to laryngopharynx line
+  //beta = angle between line from mandible point to laryngopharynx line
   roiManager("Select", "laryngopharynx");
   run("Measure");
   beta = (getResult("Angle", nResults-1);
   //TODO check if angle is negative or correct
   
-//jaw protrusion length = d * sin(beta)
+//jaw protrusion length = d * sin(beta) (thanks to trig from my son)
   jaw_protrusion = d * sin(beta);
   
 //e oropharynx width: pharynx width measured as the shortest distance between the posterior contour of the tongue, and the mucosal cover of the spine
-  oropharynx_width = 0;
+  //find post posterior value of tongue contour (largest x)
+  roiManager("Select", "tongue_posterior");
+  Roi.getCoordinates(xpoints_tp, ypoints_tp);
+  tp.x = xpoints_tp[0];
+  for (i=1; i<xpoints_tp.length; i++); {
+    if(tp.x < xpoints_tp[i]); {
+      tp.x = xpoints_tp[i];
+      }    
+  }
+  
+  //calculate difference between posterior tongue value (tp.x) and oropharynx_xy[0]
+  oropharynx_width = oropharynx_xy[0]-tp.x;
 
 //f uvula elevation: the distance between a line extending the upper contour of the hard palate and a parallel line tangent to the lowermost part of the uvula contour
-  uvula_elevation = abs(hard_palate_xy[1]-uvula_xy[1]);
+  uvula_elevation = abs(uvula_xy[1]-hard_palate_xy[1]);
 
 //An auxiliary line (A) was drawn for the measurement of the larynx position and laryngeal tilting. This auxiliary line connects the cranial-most part of the dens axis and the caudo-anterior edge of the sixth vertebra.
   makeLine(densaxis_xy[0], densaxis_xy[1], vertebra_xy[0], vertebra_xy[1]);
 
 //g larynx position: the distance from the cranial-most part of the dens axis to the point where auxiliary line A crosses a line (auxiliary line B) from the anterior commissure rectangular to auxiliary line A
+//TODO
   larynx_position = 0;
   
 //h angle of larynx tilt: the larynx tilt measured as the angle between auxiliary line A and a line from the anterior commissure to the vocal process
