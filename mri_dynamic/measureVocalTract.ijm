@@ -64,15 +64,16 @@ macro "MRI Labeling [f10]" {
 //7d. Posterior wall of the laryngopharynx (line)
   setTool("line");
   waitForUser('Selection Required','Draw a line along the posterior wall of the laryngopharynx from top to bottom extending below the level of the mandible, then click OK');
+  laryngopharynx_roi = roiManager("count")-1;
   laryngopharynx_xy = nameGetXY("laryngopharynx");
 
 //8e. Posterior contour of the tongue (contour)
   setTool("freeline");
   waitForUser('Selection Required','Outline the posterior contour of the tongue by freehand drawing a line, then click OK');
   roiManager("Add");
-  roiManager("Select", roiManager("count")-1);
+  tongue_posterior_roi = roiManager("count")-1;
+  roiManager("Select", tongue_posterior_roi);
   roiManager("Rename", "tongue_posterior");
-  //TODO not sure what to do with this contour
 
 //9e. Posterior wall of oropharynx (line)
   setTool("line");
@@ -115,7 +116,7 @@ macro "MRI Labeling [f10]" {
   run("Text Window...", "name="+totalResults+" width=40 height=20");
  
 //print header for results TODO update headers
-  print("["+totalResults+"]", "filename\t" 
+  print("["+totalResults+"]", "filename," 
   + "a-lip_opening," + "b-jaw_opening," + "c-tongue_dorsum," 
   + "d-jaw_protrusion," + "e-oropharynx_width," + "f-uvula_elevation,"
   + "g-larynx_position," + "h-angle_of_larynx_tilt\n");
@@ -139,15 +140,16 @@ macro "MRI Labeling [f10]" {
 
 //d jaw protrusion: the distance between the lower front edge of the mandible and the mucosal cover of the spine at a 90-degree angle
   //find x value of laryngopharynx line at y value of mandible point
-  roiManager("Select", "laryngopharynx");
-  Roi.getCoordinates(xpoints_lp, ypoints_lp);
+  roiManager("Select", laryngopharynx_roi);
+//NEED TO TROUBLESHOOT
+  Roi.getCoordinates(xpoints_lp, ypoints_lp); //this is the wrong command
   //reverse array if drawn wrong direction TODO
-  d.x = xpoints_lp[0];
-  d.y = ypoints_lp[0];
+  d_x = xpoints_lp[0];
+  d_y = ypoints_lp[0];
   i = 1;
-  while (d.y < front_mandible_xy[1]) {
-    d.x = xpoints_lp[i];
-    d.y = ypoints_lp[i];
+  while (d_y < front_mandible_xy[1]) {
+    d_x = xpoints_lp[i];
+    d_y = ypoints_lp[i];
     i++;
   //Error handling
     if(i == xpoints.length); {
@@ -162,7 +164,7 @@ macro "MRI Labeling [f10]" {
   }
   
   //draw line from front of mandible to laryngopharynx line
-  makeLine(front_mandible_xy[0], front_mandible_xy[1], d.x, d.y);
+  makeLine(front_mandible_xy[0], front_mandible_xy[1], d_x, d_y);
   roiManager("Add");
   roiManager("Rename", "mandToLaryngopharynx");
   run("Measure");
@@ -170,7 +172,7 @@ macro "MRI Labeling [f10]" {
   d = (getResult("Length", nResults-1);
   
   //beta = angle between line from mandible point to laryngopharynx line
-  roiManager("Select", "laryngopharynx");
+  roiManager("Select", laryngopharynx_roi);
   run("Measure");
   beta = (getResult("Angle", nResults-1);
   //TODO check if angle is negative or correct
@@ -180,7 +182,7 @@ macro "MRI Labeling [f10]" {
   
 //e oropharynx width: pharynx width measured as the shortest distance between the posterior contour of the tongue, and the mucosal cover of the spine
   //find post posterior value of tongue contour (largest x)
-  roiManager("Select", "tongue_posterior");
+  roiManager("Select", tongue_posterior_roi);
   Roi.getCoordinates(xpoints_tp, ypoints_tp);
   tp.x = xpoints_tp[0];
   for (i=1; i<xpoints_tp.length; i++); {
