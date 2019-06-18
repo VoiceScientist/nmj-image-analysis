@@ -95,10 +95,13 @@ macro "NMJ Analysis [f10]" {
 
 //ask user if want to manually review thresholds
   Dialog.create("Manual threshold review?");
-  Dialog.addCheckbox("Manually adjust thresholds before analysis", true);
+  Dialog.addCheckbox("Manually adjust ENDPLATE thresholds before analysis", true);
+  Dialog.addCheckbox("Manually adjust TERMINAL thresholds before analysis", true);
   Dialog.addMessage("If checkbox is deselected, autothresholding will be applied");
   Dialog.show();
-  manualThreshold = Dialog.getCheckbox();
+  manualThreshold_endplate = Dialog.getCheckbox();
+  manualThreshold_terminal = Dialog.getCheckbox();
+  
 
 //select directory of .tiff images to process
   dir = getDirectory("Choose a directory of terminal and endplate images");
@@ -158,14 +161,19 @@ macro "NMJ Analysis [f10]" {
 	  //autothreshold stack
 	    setAutoThreshold("Default dark stack");
 
-	  if(manualThreshold) {
+	  if(manualThreshold_terminal) {
 	    getThreshold(lower, upper);
 	  //take value from autothresholded stack and apply to new z-proj
 	    run("Z Project...", "projection=[Max Intensity]");
 	    setThreshold(lower, upper);
+		run("In [+]");
+		run("In [+]");
+		tempZstack = getImageID();
 	  //ask user to adjust threshold if necessary
-	    waitForUser('Threshold','Adjust threshold on z-stack if necessary, then click OK');
+	    waitForUser('Threshold','Adjust threshold on z-stack if necessary, then click OK\nIf thresholding tool is not open, press ctrl+shift+t');
+		select(tempZstack);
 	    getThreshold(lower, upper);
+		close(tempZstack);
 	  //apply default or adjusted threshold
 	    selectImage(terminal); 
 	    setThreshold(lower, upper);
@@ -183,14 +191,19 @@ macro "NMJ Analysis [f10]" {
 	  //autothreshold stack
 	    setAutoThreshold("Default dark stack");
 
-	  if(manualThreshold) {
+	  if(manualThreshold_endplate) {
 	    getThreshold(lower, upper);
 	  //take value from autothresholded stack and apply to new z-proj
 	    run("Z Project...", "projection=[Max Intensity]");
 	    setThreshold(lower, upper);
+		run("In [+]");
+		run("In [+]");
+		tempZstack = getImageID();
 	  //ask user to adjust threshold if necessary
 	    waitForUser('Threshold','Adjust threshold on z-stack if necessary, then click OK');
+		select(tempZstack);
 	    getThreshold(lower, upper);
+		close(tempZstack);
 	  //apply default or adjusted threshold
 	    selectImage(endplate); 
 	    setThreshold(lower, upper);
