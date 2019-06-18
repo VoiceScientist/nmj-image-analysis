@@ -27,6 +27,7 @@
  * - fixed rotation in synaptic overlap and enfacedisp
  * - removed 3D dispersion ratio calculation
  * - added reporting of enface areas for endplate and terminal
+ * - changed results output to .csv format 
  * 
  * Version 2.6.2
  * 05/09/2019
@@ -86,7 +87,7 @@
 
 macro "NMJ Analysis [f10]" {
 //OPTIONAL: decrease the run time by not displaying new images (may cause problem with some commands)
-//  setBatchMode(true); 
+  setBatchMode(true); 
 
 //create a TimeStamp to record day and time analysis took place
   startTime = timeStamp();
@@ -106,11 +107,12 @@ macro "NMJ Analysis [f10]" {
 
 //print header for results
   print("["+totalResults+"]", 
-    "filename\t" + "termVol\t" 
-    + "endplateVol\t" + "xRot\t" + "yRot\t" 
-    + "terminalArea\t" + "endplateArea\t"
-    + "overlap\t" + "efDispRatio\t" 
-    + "frag\t"+ "fragvol\n");
+    "filename," 
+    + "termVol," + "endplateVol," 
+    + "xRot," + "yRot," + "overlap," 
+    + "terminalArea," + "endplateArea,"
+    + "efDispRatio," 
+    + "frag,"+ "fragvol\n");
 
 //create output directory to store results (and montage images??)
   outputDir = dir + "Analysis_" + startTime + File.separator;
@@ -139,7 +141,7 @@ macro "NMJ Analysis [f10]" {
       print("["+batchLog+"]", filename + "\t" + currTime + "\n");
 
     //add filename to output
-	  print("["+totalResults+"]", filename + "\t");
+	  print("["+totalResults+"]", filename + ",");
 
 /** THRESHOLDING AND CONVERTING TO BINARY **/
 
@@ -194,12 +196,12 @@ macro "NMJ Analysis [f10]" {
 
     //Add the results to total results file
       print("["+totalResults+"]",
-        d2s(termVol, 0) + "\t" + d2s(endVol, 0) + "\t"  
-		+ synOverlap[0] + "\t" + synOverlap[1] + "\t" 
-		+ synOverlap[2] + "\t" + synOverlap[4] + "\t"
-		+ synOverlap[5] + efDispRatio + "\t" + fragNum);
+        d2s(termVol, 0) + "," + d2s(endVol, 0) + ","  
+		+ synOverlap[0] + "," + synOverlap[1] + "," 
+		+ synOverlap[2] + "," + synOverlap[4] + ","
+		+ synOverlap[5] + "," + efDispRatio + "," + fragNum);
       for (k=1; k<lengthOf(endplateFrag); k++) {
-	    print("["+totalResults+"]", "\t" + endplateFrag[k]);
+	    print("["+totalResults+"]", "," + endplateFrag[k]);
 	  }
       Array.print(endplateFrag); 
 	  print("["+totalResults+"]", "\n");
@@ -239,9 +241,7 @@ macro "NMJ Analysis [f10]" {
   run("Close");
   
   selectWindow("TotalResults");
-  save(outputDir + "TotalResults_" + startTime + ".txt");
-//NEXT LINE IS FOR DEBUGGING
-//  save("C:/Users/JOHNSON/Documents/My Dropbox/1_Projects/Dissertation/Stats/" + "results_" + startTime + ".txt");
+  run("Text...", "save=[" + outputDir + "TotalResults_" + startTime + ".csv]");
   run("Close");
 
   showMessage("Macro Complete");
@@ -278,48 +278,47 @@ function stackVolume(image) {
  */
 
 function synapticOverlap(epStack, termStack) {
-//reslice with linear transformation (same method as 3D projection) to make voxels square (.07x.07x.07 micron)
+//reslice with linear transformation (same method as 3D projection) to make voxels square (so we don't need to interpolate in 3D projection)
 
-/** commenting out section for troubleshooting 5/24/2019
   selectImage(epStack);
   getVoxelSize(vwidth, vheight, vdepth, vunit);
   zfactor = vdepth / vwidth;
   run("TransformJ Scale", "x-factor=1.0 y-factor=1.0 z-factor="+zfactor+" interpolation=linear");
   epScaled = getImageID();
-**/
 
 //find maximum area in y-axis rotation
 //rotate the resliced endplate stack; create 180 degree 3D projection with 1 degree rotations on y-axis - no need for interpolation b/c distance between stacks is now less than 1 pixel
 //commenting out for troubleshooting  selectImage(epScaled);
-  selectImage(epStack);
+  selectImage(epScaled);
   getVoxelSize(vwidth, vheight, vdepth, vunit);
   run("3D Project...", "projection=[Brightest Point] axis=Y-Axis slice="+vdepth+" initial=0 total=180 rotation=1 lower=1 upper=255 opacity=0 surface=0 interior=0");
 //convert 3D projection to binary
-  setThreshold(1, 255);
-  run("Convert to Mask", "  black");
+//  setThreshold(1, 255);
+//  run("Convert to Mask", "  black");
 //find y rotation angle
-  run("Set Measurements...", "area limit redirect=None decimal=2");
   run("Clear Results");
-  maxArea = 0;
+  run("Set Measurements...", "area limit redirect=None decimal=2");
+  maxAreaY = 0;
   yRot = 0;
   for(j=1; j<180; j++) {
     setSlice(j);
+    setThreshold(1, 255);
 	run("Measure");
-    if(getResult("Area") > maxArea) {
+    if(getResult("Area") > maxAreaY) {
       yRot = j-1;
-      maxArea = getResult("Area");
+      maxAreaY = getResult("Area");
     }
   } //end rotation for loop
 
 
 //NEXT LINE IS FOR DEBUGGING
 //for debugging save results
-    selectWindow("Results");
-    saveAs("text", outputDir + filename + "maxareaY");
+//    selectWindow("Results");
+//    saveAs("text", outputDir + filename + "maxEPareaY");
 
 
 //after maximum area is found, use TransformJ to rotate the resliced image to the maximum area y-axis angle
-  selectImage(epStack);
+  selectImage(epScaled);
   run("TransformJ Rotate", "z-angle=0.0 y-angle=" + yRot + " x-angle=0.0 interpolation=[nearest neighbor] background=0.0 adjust");
   epScaledYRot = getImageID();
   
@@ -328,26 +327,28 @@ function synapticOverlap(epStack, termStack) {
   getVoxelSize(vwidth, vheight, vdepth, vunit);
   run("3D Project...", "projection=[Brightest Point] axis=X-Axis slice="+vdepth+" initial=0 total=180 rotation=1 lower=1 upper=255 opacity=0 surface=0 interior=0");
 //convert 3D projection to binary
-  setThreshold(1, 255);
-  run("Convert to Mask", "  black");
+//  setThreshold(1, 255);
+//  run("Convert to Mask", "  black");
 //rotate find x rotation angle
-  maxArea = 0;
+  maxAreaX = 0;
   xRot = 0;
   run("Clear Results");
+  run("Set Measurements...", "area mean limit redirect=None decimal=3");
   for(j=1; j<180; j++) {
     setSlice(j);
+    setThreshold(1, 255);  
 	run("Measure");
-    if(getResult("Area") > maxArea) {
+    if(getResult("Area") > maxAreaX) {
       xRot = j-1;
-      maxArea = getResult("Area");
+      maxAreaX = getResult("Area");
     }
   } //end rotation for loop
 
   
 //NEXT LINE IS FOR DEBUGGING
 //for debugging save results
-    selectWindow("Results");
-    saveAs("text", outputDir + filename + "maxareaX");
+//    selectWindow("Results");
+//    saveAs("text", outputDir + filename + "maxEPareaX");
 
 
 //when the maximum area is found, use TransformJ to rotate epScaledYRot to the maximum area x-axis angle
@@ -358,7 +359,7 @@ function synapticOverlap(epStack, termStack) {
   
 //NEXT LINE IS FOR DEBUGGING
 //save rotated image
-saveAs("tiff", outputDir + filename + "_rotatedEndplate");
+//saveAs("tiff", outputDir + filename + "_rotatedEndplate");
 
   
   //create z-proj of rotated endplate stack
@@ -385,7 +386,7 @@ saveAs("tiff", outputDir + filename + "_rotatedEndplate");
   
 //NEXT LINE IS FOR DEBUGGING
 //save rotated image
-  saveAs("tiff", outputDir + filename + "_rotatedTerminal");
+//  saveAs("tiff", outputDir + filename + "_rotatedTerminal");
 
   
 //create z-proj of rotated terminal stack
@@ -420,12 +421,12 @@ saveAs("tiff", outputDir + filename + "_rotatedEndplate");
   selectImage(endplateZ);
   run("Canvas Size...", "width=maxW height=maxH position=Center zero");
 //NEXT LINE IS FOR DEBUGGING
-saveAs("tiff", outputDir + filename + "_maxEndplateZ");
+//saveAs("tiff", outputDir + filename + "_maxEndplateZ");
 
   selectImage(terminalZ);
   run("Canvas Size...", "width=maxW height=maxH position=Center zero");
 //NEXT LINE IS FOR DEBUGGING
-saveAs("tiff", outputDir + filename + "_maxTerminalZ");
+//saveAs("tiff", outputDir + filename + "_maxTerminalZ");
 
 //create merged image to save
   selectImage(endplateZ);
@@ -446,7 +447,7 @@ saveAs("tiff", outputDir + filename + "_maxTerminalZ");
   overlapArea = getResult("Area");
 
 //NEXT LINE IS FOR DEBUGGING
-  saveAs("tiff", outputDir + filename + "_maxOverlapZ");
+//  saveAs("tiff", outputDir + filename + "_maxOverlapZ");
   
 //calculate overlap percentage: overlapZ (terminalZ AND endplateZ) area divided by endplate area
 	overlapPerc = overlapArea / endplateArea;
