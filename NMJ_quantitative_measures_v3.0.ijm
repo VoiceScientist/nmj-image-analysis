@@ -171,7 +171,7 @@ macro "NMJ Analysis [f10]" {
 		tempZstack = getImageID();
 	  //ask user to adjust threshold if necessary
 	    waitForUser('Threshold','Adjust threshold on z-stack if necessary, then click OK\nIf thresholding tool is not open, press ctrl+shift+t');
-		select(tempZstack);
+		selectImage(tempZstack);
 	    getThreshold(lower, upper);
 		close(tempZstack);
 	  //apply default or adjusted threshold
@@ -201,7 +201,7 @@ macro "NMJ Analysis [f10]" {
 		tempZstack = getImageID();
 	  //ask user to adjust threshold if necessary
 	    waitForUser('Threshold','Adjust threshold on z-stack if necessary, then click OK');
-		select(tempZstack);
+		selectImage(tempZstack);
 	    getThreshold(lower, upper);
 		close(tempZstack);
 	  //apply default or adjusted threshold
