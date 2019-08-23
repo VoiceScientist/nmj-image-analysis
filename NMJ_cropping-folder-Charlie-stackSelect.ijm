@@ -62,15 +62,23 @@ macro "NMJ Cropping - Folder [f10]" {
 	  n = roiManager("count");
 	  for (j=0; j<n; j++) {
 		  selectImage(currImage);
+		  stackStart=1;
+		  stackEnd=nSlices;
 		  roiManager("select", j);
-		  //ask user if sub-stack should be duplicated
+		//ask user if sub-stack should be duplicated
+		  subStack = getBoolean("Create substack?");
+			if(subStack) {
 		  //if yes, ask user to move slider to beginning of stack (lower slice number) and click 'ok'
+			  waitForUser('Select Starting Slice','To create a substack, first move the slider to the the first slice \n in the desired substack (lower slice number) then click OK');
 		  //copy current slice to var stackStart
+			  stackStart=getSliceNumber();
 		  //ask user to move slider to end of stack (higher slice number) and click 'ok'
+			  waitForUser('Select Last Slice','Now move the slider to the the last slice in the desired substack (higher slice number) then click OK');
 		  //copy current slice to var stackEnd
-		  run("Duplicate...", "duplicate range="stackStart"-"stackEnd);
-		  //if no, run Duplicate
-		  run("Duplicate...", "duplicate");
+			stackEnd=getSliceNumber();
+			}
+		  //Duplicate stack (or sub-stack)
+		  run("Duplicate...", "duplicate slices=" + stackStart + "-" + stackEnd);
 		//delete any area outside of a non-rectangular ROI in the new image - REMOVED
 //		  setBackgroundColor(0, 0, 0);
 //		  run("Clear Outside", "stack");
