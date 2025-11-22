@@ -503,9 +503,14 @@ function synapticOverlap(epStack, termStack) {
 
 //NEXT LINE IS FOR DEBUGGING
 //  saveAs("tiff", outputDir + filename + "_maxOverlapZ");
-  
+
 //calculate overlap percentage: overlapZ (terminalZ AND endplateZ) area divided by endplate area
-	overlapPerc = overlapArea / endplateArea;
+	if(endplateArea > 0) {
+		overlapPerc = overlapArea / endplateArea;
+	} else {
+		overlapPerc = 0;
+		print("["+batchLog+"]", "WARNING: " + filename + " - endplate area is 0, cannot calculate overlap\n");
+	}
 
   return newArray(xRot, yRot, overlapPerc, endplateZ, terminalArea, endplateArea);
 
@@ -527,12 +532,17 @@ function enFaceDispersion(image) {
   dispArea = getResult("Area", nResults-1);
 
   //calculate dispersion ratio
-  dispenface = dispArea/stainedArea;
+  if(stainedArea > 0) {
+	  dispenface = dispArea/stainedArea;
+  } else {
+	  dispenface = 0;
+	  print("["+batchLog+"]", "WARNING: " + filename + " - stained area is 0, cannot calculate dispersion\n");
+  }
 
   //save dispersion image stack projection
   path = outputDir + filename + "_enFaceDisp";
   saveAs("Jpeg", path);
-  
+
   //return dispersion area
   return dispenface;
 
