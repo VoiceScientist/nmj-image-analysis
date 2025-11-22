@@ -107,6 +107,17 @@ macro "NMJ Analysis [f10]" {
   dir = getDirectory("Choose a directory of terminal and endplate images");
   dirlist = getFileList(dir);
 
+//validate that directory contains .tif files
+  tiffCount = 0;
+  for(i=0; i<dirlist.length; i++) {
+    if(endsWith(dirlist[i], "tif")) tiffCount++;
+  }
+
+  if(tiffCount == 0) {
+    showMessage("Error", "No .tif files found in selected directory!\n\nPlease select a directory containing .tif images.");
+    exit();
+  }
+
 //create text window to save the cumulative results 
   totalResults = "TotalResults";
   run("Text Window...", "name="+totalResults+" width=40 height=20");
@@ -115,6 +126,7 @@ macro "NMJ Analysis [f10]" {
   batchLog = "BatchLog";
   run("Text Window...", "name="+batchLog+" width=60 height=20");
   print("["+batchLog+"]", "Batch started: " + startTime + "\n");
+  print("["+batchLog+"]", "Found " + tiffCount + " .tif files to process\n\n");
 
 //print header for results
   print("["+totalResults+"]", 
@@ -135,6 +147,14 @@ macro "NMJ Analysis [f10]" {
     currfile = dir+dirlist[i];
 
     if(endsWith(currfile, "tif")) {
+    //update progress bar and status message
+      currentFileNum = 0;
+      for(j=0; j<=i; j++) {
+        if(endsWith(dirlist[j], "tif")) currentFileNum++;
+      }
+      showProgress(currentFileNum / tiffCount);
+      showStatus("Processing file " + currentFileNum + " of " + tiffCount + ": " + dirlist[i]);
+
     //open hyperstack tiff image and split
       open(currfile);
 	  run("Split Channels");
@@ -156,65 +176,9 @@ macro "NMJ Analysis [f10]" {
 
 /** THRESHOLDING AND CONVERTING TO BINARY **/
 
-    //binarize terminal stack (threshold and remove noise)
-	  selectImage(terminal);
-	  //autothreshold stack
-	    setAutoThreshold("Default dark stack");
-
-	  if(manualThreshold_terminal) {
-	    getThreshold(lower, upper);
-	  //take value from autothresholded stack and apply to new z-proj
-	    run("Z Project...", "projection=[Max Intensity]");
-	    setThreshold(lower, upper);
-		run("In [+]");
-		run("In [+]");
-		tempZstack = getImageID();
-	  //ask user to adjust threshold if necessary
-	    waitForUser('Threshold','Adjust threshold on z-stack if necessary, then click OK\nIf thresholding tool is not open, press ctrl+shift+t');
-		selectImage(tempZstack);
-	    getThreshold(lower, upper);
-		close(tempZstack);
-	  //apply default or adjusted threshold
-	    selectImage(terminal); 
-	    setThreshold(lower, upper);
-	  } //endif manualThreshold
-
-	  //convert to binary (mask)
-	  run("Convert to Mask", "method=Default background=Dark black");
-	  //smooth out noise with median filter (only 2D, runs on each slice)
-	  run("Median...", "radius=2 stack"); 
-	  //update terminal variable to new thresholded image
-	  terminal = getImageID();
-	  
-    //binarize endplate stack (threshold and remove noise)
-	  selectImage(endplate);
-	  //autothreshold stack
-	    setAutoThreshold("Default dark stack");
-
-	  if(manualThreshold_endplate) {
-	    getThreshold(lower, upper);
-	  //take value from autothresholded stack and apply to new z-proj
-	    run("Z Project...", "projection=[Max Intensity]");
-	    setThreshold(lower, upper);
-		run("In [+]");
-		run("In [+]");
-		tempZstack = getImageID();
-	  //ask user to adjust threshold if necessary
-	    waitForUser('Threshold','Adjust threshold on z-stack if necessary, then click OK');
-		selectImage(tempZstack);
-	    getThreshold(lower, upper);
-		close(tempZstack);
-	  //apply default or adjusted threshold
-	    selectImage(endplate); 
-	    setThreshold(lower, upper);
-	  } //endif manualThreshold
-
-	  //convert to binary (mask)
- 	  run("Convert to Mask", "method=Default background=Dark black");
-       //smooth out noise with median filter (only 2D, runs on each slice)
-      run("Median...", "radius=2 stack");
-	  //update endplate variable to new thresholded image
-	  endplate = getImageID();
+    //binarize terminal and endplate stacks (threshold and remove noise)
+	  terminal = binarizeStack(terminal, manualThreshold_terminal, "TERMINAL");
+	  endplate = binarizeStack(endplate, manualThreshold_endplate, "ENDPLATE");
 
 
 /** MEASUREMENTS START; DO NOT CHANGE CODE BELOW **/
@@ -272,9 +236,11 @@ macro "NMJ Analysis [f10]" {
         close();
       }
 
-    //close the results window
-      selectWindow("Results");
-      run("Close");
+    //close the results window if it exists
+      if(isOpen("Results")) {
+        selectWindow("Results");
+        run("Close");
+      }
 
 	  setBatchMode(false);
     } //end if(.tif document)
@@ -286,22 +252,70 @@ macro "NMJ Analysis [f10]" {
   print("["+batchLog+"]", "Batch completed: " + stopTime + "\n");
 
 //save batch log
-  selectWindow("BatchLog");
-  save(outputDir + "BatchLog_" + startTime + ".txt");
-  run("Close");
+  if(isOpen("BatchLog")) {
+    selectWindow("BatchLog");
+    save(outputDir + "BatchLog_" + startTime + ".txt");
+    run("Close");
+  }
 
 //save results
-  selectWindow("Log");
-  save(outputDir + "3D Objects summary_" + startTime + ".txt");
-  run("Close");
-  
-  selectWindow("TotalResults");
-  run("Text...", "save=[" + outputDir + "TotalResults_" + startTime + ".csv]");
-  run("Close");
+  if(isOpen("Log")) {
+    selectWindow("Log");
+    save(outputDir + "3D Objects summary_" + startTime + ".txt");
+    run("Close");
+  }
+
+  if(isOpen("TotalResults")) {
+    selectWindow("TotalResults");
+    run("Text...", "save=[" + outputDir + "TotalResults_" + startTime + ".csv]");
+    run("Close");
+  }
 
   showMessage("Macro Complete");
   setBatchMode(false); 
 } //end macro
+
+
+/**
+ * Function to binarize a stack with optional manual threshold review.
+ *
+ * @param imageID The ID of the image to threshold
+ * @param manualReview Whether to allow manual threshold adjustment
+ * @param imageName Name of the image for user prompts (e.g., "TERMINAL" or "ENDPLATE")
+ * @return The ID of the binarized image
+ */
+function binarizeStack(imageID, manualReview, imageName) {
+  selectImage(imageID);
+
+  //autothreshold stack
+  setAutoThreshold("Default dark stack");
+
+  if(manualReview) {
+    getThreshold(lower, upper);
+    //take value from autothresholded stack and apply to new z-proj
+    run("Z Project...", "projection=[Max Intensity]");
+    setThreshold(lower, upper);
+    run("In [+]");
+    run("In [+]");
+    tempZstack = getImageID();
+    //ask user to adjust threshold if necessary
+    waitForUser('Threshold','Adjust '+imageName+' threshold on z-stack if necessary, then click OK\nIf thresholding tool is not open, open it via Image > Adjust > Threshold');
+    selectImage(tempZstack);
+    getThreshold(lower, upper);
+    close(tempZstack);
+    //apply default or adjusted threshold
+    selectImage(imageID);
+    setThreshold(lower, upper);
+  } //endif manualThreshold
+
+  //convert to binary (mask)
+  run("Convert to Mask", "method=Default background=Dark black");
+  //smooth out noise with median filter (only 2D, runs on each slice)
+  run("Median...", "radius=2 stack");
+
+  //return the binarized image ID
+  return getImageID();
+}
 
 
 /**
