@@ -26,8 +26,9 @@ macro "NMJ Cropping [f10]" {
 currImage = getImageID();
 filename = substring(getTitle(), 0, lastIndexOf(getTitle(), "."));
 dir = getDirectory("image");
-//change path below to desired save directory - be sure to put two back slashes between directories
-saveDir = "R:\\johnsa30lab\\johnsa30labspace\\1-Projects\\Vocal Dose - K23 - Animal\\NMJ Confocal\\Ready for Analysis"
+//create directory for new images in same location as source image
+saveDir = dir + "cropped" + File.separator;
+File.makeDirectory(saveDir);
 run("Z Project...", "projection=[Max Intensity]");
 run("Enhance Contrast", "saturated=0.35");
 
@@ -48,7 +49,7 @@ n = roiManager("count");
       roiManager("select", i);
       run("Duplicate...", "duplicate");
 	  setBackgroundColor(0, 0, 0);
-	  run("Clear Outside");
+	  run("Clear Outside", "stack");
 	  imageNum = i+1;
 	  saveAs("tiff", saveDir + File.separator + filename + "-" + imageNum);
   }

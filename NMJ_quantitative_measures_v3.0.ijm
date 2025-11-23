@@ -85,8 +85,27 @@
  * - Added synaptic overlap and endplate fragmentation
  * - Incorporated stack volume from previous NMJ_Volume plugin (that plugin is no longer needed)
  * 
- * 
+ *
  */
+
+///////////////////////////////////////////////////////////////////////////////
+// CONFIGURATION CONSTANTS
+///////////////////////////////////////////////////////////////////////////////
+
+// Image processing parameters
+var MEDIAN_FILTER_RADIUS = 2;           // Noise reduction filter size (pixels)
+var BINARY_THRESHOLD_LOWER = 1;         // Lower threshold for binary images
+var BINARY_THRESHOLD_UPPER = 255;       // Upper threshold for binary images
+
+// 3D rotation parameters
+var ROTATION_INCREMENT = 1;              // Degrees per rotation step
+var ROTATION_TOTAL = 180;                // Total rotation angle to search
+
+// Fragmentation analysis parameters
+var MIN_FRAGMENT_SIZE = 255;             // Minimum fragment size (voxels, ~1 cubic micron)
+var MAX_FRAGMENT_SIZE = 9999999;         // Maximum fragment size (effectively unlimited)
+
+///////////////////////////////////////////////////////////////////////////////
 
 
 macro "NMJ Analysis [f10]" {
@@ -107,6 +126,17 @@ macro "NMJ Analysis [f10]" {
   dir = getDirectory("Choose a directory of terminal and endplate images");
   dirlist = getFileList(dir);
 
+//validate that directory contains .tif files
+  tiffCount = 0;
+  for(i=0; i<dirlist.length; i++) {
+    if(endsWith(dirlist[i], "tif")) tiffCount++;
+  }
+
+  if(tiffCount == 0) {
+    showMessage("Error", "No .tif files found in selected directory!\n\nPlease select a directory containing .tif images.");
+    exit();
+  }
+
 //create text window to save the cumulative results 
   totalResults = "TotalResults";
   run("Text Window...", "name="+totalResults+" width=40 height=20");
@@ -115,6 +145,7 @@ macro "NMJ Analysis [f10]" {
   batchLog = "BatchLog";
   run("Text Window...", "name="+batchLog+" width=60 height=20");
   print("["+batchLog+"]", "Batch started: " + startTime + "\n");
+  print("["+batchLog+"]", "Found " + tiffCount + " .tif files to process\n\n");
 
 //print header for results
   print("["+totalResults+"]", 
@@ -135,6 +166,14 @@ macro "NMJ Analysis [f10]" {
     currfile = dir+dirlist[i];
 
     if(endsWith(currfile, "tif")) {
+    //update progress bar and status message
+      currentFileNum = 0;
+      for(j=0; j<=i; j++) {
+        if(endsWith(dirlist[j], "tif")) currentFileNum++;
+      }
+      showProgress(currentFileNum / tiffCount);
+      showStatus("Processing file " + currentFileNum + " of " + tiffCount + ": " + dirlist[i]);
+
     //open hyperstack tiff image and split
       open(currfile);
 	  run("Split Channels");
@@ -156,65 +195,9 @@ macro "NMJ Analysis [f10]" {
 
 /** THRESHOLDING AND CONVERTING TO BINARY **/
 
-    //binarize terminal stack (threshold and remove noise)
-	  selectImage(terminal);
-	  //autothreshold stack
-	    setAutoThreshold("Default dark stack");
-
-	  if(manualThreshold_terminal) {
-	    getThreshold(lower, upper);
-	  //take value from autothresholded stack and apply to new z-proj
-	    run("Z Project...", "projection=[Max Intensity]");
-	    setThreshold(lower, upper);
-		run("In [+]");
-		run("In [+]");
-		tempZstack = getImageID();
-	  //ask user to adjust threshold if necessary
-	    waitForUser('Threshold','Adjust threshold on z-stack if necessary, then click OK\nIf thresholding tool is not open, press ctrl+shift+t');
-		selectImage(tempZstack);
-	    getThreshold(lower, upper);
-		close(tempZstack);
-	  //apply default or adjusted threshold
-	    selectImage(terminal); 
-	    setThreshold(lower, upper);
-	  } //endif manualThreshold
-
-	  //convert to binary (mask)
-	  run("Convert to Mask", "method=Default background=Dark black");
-	  //smooth out noise with median filter (only 2D, runs on each slice)
-	  run("Median...", "radius=2 stack"); 
-	  //update terminal variable to new thresholded image
-	  terminal = getImageID();
-	  
-    //binarize endplate stack (threshold and remove noise)
-	  selectImage(endplate);
-	  //autothreshold stack
-	    setAutoThreshold("Default dark stack");
-
-	  if(manualThreshold_endplate) {
-	    getThreshold(lower, upper);
-	  //take value from autothresholded stack and apply to new z-proj
-	    run("Z Project...", "projection=[Max Intensity]");
-	    setThreshold(lower, upper);
-		run("In [+]");
-		run("In [+]");
-		tempZstack = getImageID();
-	  //ask user to adjust threshold if necessary
-	    waitForUser('Threshold','Adjust threshold on z-stack if necessary, then click OK');
-		selectImage(tempZstack);
-	    getThreshold(lower, upper);
-		close(tempZstack);
-	  //apply default or adjusted threshold
-	    selectImage(endplate); 
-	    setThreshold(lower, upper);
-	  } //endif manualThreshold
-
-	  //convert to binary (mask)
- 	  run("Convert to Mask", "method=Default background=Dark black");
-       //smooth out noise with median filter (only 2D, runs on each slice)
-      run("Median...", "radius=2 stack");
-	  //update endplate variable to new thresholded image
-	  endplate = getImageID();
+    //binarize terminal and endplate stacks (threshold and remove noise)
+	  terminal = binarizeStack(terminal, manualThreshold_terminal, "TERMINAL");
+	  endplate = binarizeStack(endplate, manualThreshold_endplate, "ENDPLATE");
 
 
 /** MEASUREMENTS START; DO NOT CHANGE CODE BELOW **/
@@ -272,9 +255,11 @@ macro "NMJ Analysis [f10]" {
         close();
       }
 
-    //close the results window
-      selectWindow("Results");
-      run("Close");
+    //close the results window if it exists
+      if(isOpen("Results")) {
+        selectWindow("Results");
+        run("Close");
+      }
 
 	  setBatchMode(false);
     } //end if(.tif document)
@@ -286,22 +271,110 @@ macro "NMJ Analysis [f10]" {
   print("["+batchLog+"]", "Batch completed: " + stopTime + "\n");
 
 //save batch log
-  selectWindow("BatchLog");
-  save(outputDir + "BatchLog_" + startTime + ".txt");
-  run("Close");
+  if(isOpen("BatchLog")) {
+    selectWindow("BatchLog");
+    save(outputDir + "BatchLog_" + startTime + ".txt");
+    run("Close");
+  }
 
 //save results
-  selectWindow("Log");
-  save(outputDir + "3D Objects summary_" + startTime + ".txt");
-  run("Close");
-  
-  selectWindow("TotalResults");
-  run("Text...", "save=[" + outputDir + "TotalResults_" + startTime + ".csv]");
-  run("Close");
+  if(isOpen("Log")) {
+    selectWindow("Log");
+    save(outputDir + "3D Objects summary_" + startTime + ".txt");
+    run("Close");
+  }
+
+  if(isOpen("TotalResults")) {
+    selectWindow("TotalResults");
+    run("Text...", "save=[" + outputDir + "TotalResults_" + startTime + ".csv]");
+    run("Close");
+  }
 
   showMessage("Macro Complete");
   setBatchMode(false); 
 } //end macro
+
+
+/**
+ * Function to find the rotation angle that produces maximum area projection.
+ *
+ * @param imageStack The ID of the image stack to rotate
+ * @param axis The rotation axis ("X-Axis" or "Y-Axis")
+ * @return The rotation angle (in degrees) that produces maximum area
+ */
+function findMaxRotationAngle(imageStack, axis) {
+  selectImage(imageStack);
+  getVoxelSize(vwidth, vheight, vdepth, vunit);
+
+  //create 3D projection with rotation
+  run("3D Project...", "projection=[Brightest Point] axis="+axis+" slice="+vdepth+
+      " initial=0 total="+ROTATION_TOTAL+" rotation="+ROTATION_INCREMENT+
+      " lower="+BINARY_THRESHOLD_LOWER+" upper="+BINARY_THRESHOLD_UPPER+
+      " opacity=0 surface=0 interior=0");
+
+  //find rotation angle with maximum area
+  run("Clear Results");
+  run("Set Measurements...", "area limit redirect=None decimal=2");
+  maxArea = 0;
+  rotation = 0;
+
+  for(j=1; j<ROTATION_TOTAL; j++) {
+    setSlice(j);
+    setThreshold(BINARY_THRESHOLD_LOWER, BINARY_THRESHOLD_UPPER);
+    run("Measure");
+    if(getResult("Area") > maxArea) {
+      rotation = j-1;
+      maxArea = getResult("Area");
+    }
+  }
+
+  //close the 3D projection (no longer needed)
+  close();
+
+  return rotation;
+}
+
+
+/**
+ * Function to binarize a stack with optional manual threshold review.
+ *
+ * @param imageID The ID of the image to threshold
+ * @param manualReview Whether to allow manual threshold adjustment
+ * @param imageName Name of the image for user prompts (e.g., "TERMINAL" or "ENDPLATE")
+ * @return The ID of the binarized image
+ */
+function binarizeStack(imageID, manualReview, imageName) {
+  selectImage(imageID);
+
+  //autothreshold stack
+  setAutoThreshold("Default dark stack");
+
+  if(manualReview) {
+    getThreshold(lower, upper);
+    //take value from autothresholded stack and apply to new z-proj
+    run("Z Project...", "projection=[Max Intensity]");
+    setThreshold(lower, upper);
+    run("In [+]");
+    run("In [+]");
+    tempZstack = getImageID();
+    //ask user to adjust threshold if necessary
+    waitForUser('Threshold','Adjust '+imageName+' threshold on z-stack if necessary, then click OK\nIf thresholding tool is not open, open it via Image > Adjust > Threshold');
+    selectImage(tempZstack);
+    getThreshold(lower, upper);
+    close(tempZstack);
+    //apply default or adjusted threshold
+    selectImage(imageID);
+    setThreshold(lower, upper);
+  } //endif manualThreshold
+
+  //convert to binary (mask)
+  run("Convert to Mask", "method=Default background=Dark black");
+  //smooth out noise with median filter (only 2D, runs on each slice)
+  run("Median...", "radius="+MEDIAN_FILTER_RADIUS+" stack");
+
+  //return the binarized image ID
+  return getImageID();
+}
 
 
 /**
@@ -316,7 +389,7 @@ function stackVolume(image) {
   //measure area of each slice and calculate running total 
     for (j=1; j<=nSlices; j++) {
       setSlice(j);
-      setThreshold(1, 255);
+      setThreshold(BINARY_THRESHOLD_LOWER, BINARY_THRESHOLD_UPPER);
       run("Measure");
       runningTotal=runningTotal + getResult("Area", nResults-1);
     }
@@ -342,35 +415,7 @@ function synapticOverlap(epStack, termStack) {
   epScaled = getImageID();
 
 //find maximum area in y-axis rotation
-//rotate the resliced endplate stack; create 180 degree 3D projection with 1 degree rotations on y-axis - no need for interpolation b/c distance between stacks is now less than 1 pixel
-//commenting out for troubleshooting  selectImage(epScaled);
-  selectImage(epScaled);
-  getVoxelSize(vwidth, vheight, vdepth, vunit);
-  run("3D Project...", "projection=[Brightest Point] axis=Y-Axis slice="+vdepth+" initial=0 total=180 rotation=1 lower=1 upper=255 opacity=0 surface=0 interior=0");
-//convert 3D projection to binary
-//  setThreshold(1, 255);
-//  run("Convert to Mask", "  black");
-//find y rotation angle
-  run("Clear Results");
-  run("Set Measurements...", "area limit redirect=None decimal=2");
-  maxAreaY = 0;
-  yRot = 0;
-  for(j=1; j<180; j++) {
-    setSlice(j);
-    setThreshold(1, 255);
-	run("Measure");
-    if(getResult("Area") > maxAreaY) {
-      yRot = j-1;
-      maxAreaY = getResult("Area");
-    }
-  } //end rotation for loop
-
-
-//NEXT LINE IS FOR DEBUGGING
-//for debugging save results
-//    selectWindow("Results");
-//    saveAs("text", outputDir + filename + "maxEPareaY");
-
+  yRot = findMaxRotationAngle(epScaled, "Y-Axis");
 
 //after maximum area is found, use TransformJ to rotate the resliced image to the maximum area y-axis angle
   selectImage(epScaled);
@@ -378,33 +423,7 @@ function synapticOverlap(epStack, termStack) {
   epScaledYRot = getImageID();
   
 //find maximum area in x-axis rotation
-//from newly rotated stack (epScaledYRot) create 180 degree 3D projection with 1 degree rotations on x-axis, with interpolation
-  getVoxelSize(vwidth, vheight, vdepth, vunit);
-  run("3D Project...", "projection=[Brightest Point] axis=X-Axis slice="+vdepth+" initial=0 total=180 rotation=1 lower=1 upper=255 opacity=0 surface=0 interior=0");
-//convert 3D projection to binary
-//  setThreshold(1, 255);
-//  run("Convert to Mask", "  black");
-//rotate find x rotation angle
-  maxAreaX = 0;
-  xRot = 0;
-  run("Clear Results");
-  run("Set Measurements...", "area mean limit redirect=None decimal=3");
-  for(j=1; j<180; j++) {
-    setSlice(j);
-    setThreshold(1, 255);  
-	run("Measure");
-    if(getResult("Area") > maxAreaX) {
-      xRot = j-1;
-      maxAreaX = getResult("Area");
-    }
-  } //end rotation for loop
-
-  
-//NEXT LINE IS FOR DEBUGGING
-//for debugging save results
-//    selectWindow("Results");
-//    saveAs("text", outputDir + filename + "maxEPareaX");
-
+  xRot = findMaxRotationAngle(epScaledYRot, "X-Axis");
 
 //when the maximum area is found, use TransformJ to rotate epScaledYRot to the maximum area x-axis angle
   selectImage(epScaledYRot);
@@ -420,7 +439,7 @@ function synapticOverlap(epStack, termStack) {
   //create z-proj of rotated endplate stack
   selectImage(epScaledYXRot);
   run("Z Project...", "  projection=[Max Intensity]");
-  setThreshold(1, 255);
+  setThreshold(BINARY_THRESHOLD_LOWER, BINARY_THRESHOLD_UPPER);
   run("Convert to Mask", "  black");
   endplateZ = getImageID();
 //measure area for use below
@@ -446,7 +465,7 @@ function synapticOverlap(epStack, termStack) {
   
 //create z-proj of rotated terminal stack
   run("Z Project...", "  projection=[Max Intensity]");
-  setThreshold(1, 255);
+  setThreshold(BINARY_THRESHOLD_LOWER, BINARY_THRESHOLD_UPPER);
   run("Convert to Mask", "  black");
   terminalZ = getImageID();
 //measure area
@@ -495,7 +514,7 @@ function synapticOverlap(epStack, termStack) {
 
 //create image of overlap and find area
   imageCalculator("AND create", endplateZ,terminalZ);
-  setThreshold(1, 255);
+  setThreshold(BINARY_THRESHOLD_LOWER, BINARY_THRESHOLD_UPPER);
   run("Convert to Mask", "  black");
   overlapZ = getImageID();
   run("Measure");
@@ -503,9 +522,14 @@ function synapticOverlap(epStack, termStack) {
 
 //NEXT LINE IS FOR DEBUGGING
 //  saveAs("tiff", outputDir + filename + "_maxOverlapZ");
-  
+
 //calculate overlap percentage: overlapZ (terminalZ AND endplateZ) area divided by endplate area
-	overlapPerc = overlapArea / endplateArea;
+	if(endplateArea > 0) {
+		overlapPerc = overlapArea / endplateArea;
+	} else {
+		overlapPerc = 0;
+		print("["+batchLog+"]", "WARNING: " + filename + " - endplate area is 0, cannot calculate overlap\n");
+	}
 
   return newArray(xRot, yRot, overlapPerc, endplateZ, terminalArea, endplateArea);
 
@@ -515,7 +539,7 @@ function enFaceDispersion(image) {
 //requires a binary z-projection
   selectImage(image);
 //set threshold and measure area of z-projection
-  setThreshold(1, 255);
+  setThreshold(BINARY_THRESHOLD_LOWER, BINARY_THRESHOLD_UPPER);
   run("Set Measurements...", "area limit redirect=None decimal=2");
   run("Measure");
   stainedArea = getResult("Area", nResults-1);
@@ -527,12 +551,17 @@ function enFaceDispersion(image) {
   dispArea = getResult("Area", nResults-1);
 
   //calculate dispersion ratio
-  dispenface = dispArea/stainedArea;
+  if(stainedArea > 0) {
+	  dispenface = dispArea/stainedArea;
+  } else {
+	  dispenface = 0;
+	  print("["+batchLog+"]", "WARNING: " + filename + " - stained area is 0, cannot calculate dispersion\n");
+  }
 
   //save dispersion image stack projection
   path = outputDir + filename + "_enFaceDisp";
   saveAs("Jpeg", path);
-  
+
   //return dispersion area
   return dispenface;
 
@@ -564,7 +593,7 @@ function fragmentation(fimage) {
   run("Clear Results");  
 //run 3D Object Counter
 //no min size; filtering takes care of noise (FYI, 575 voxels = about 1 cubic micron)
-run("Object Counter3D", "threshold=1 slice=1 min=255 max=9999999 particles dot=5 numbers font=10 summary");
+run("Object Counter3D", "threshold="+BINARY_THRESHOLD_LOWER+" slice=1 min="+MIN_FRAGMENT_SIZE+" max="+MAX_FRAGMENT_SIZE+" particles dot=5 numbers font=10 summary");
   frag = newArray(nResults+1);
   frag[0] = nResults;
   for (k=0; k<nResults; k++){
