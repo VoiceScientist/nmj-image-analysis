@@ -174,7 +174,7 @@ See `archive/README.md` for details on older versions.
 
 If you use this software in your research, please cite:
 
-*[Add citation information when published]*
+Johnson AM, Ciucci MR, Connor NP. Vocal training mitigates age-related changes within the vocal mechanism in old rats. J Gerontol A Biol Sci Med Sci. 2013 Dec;68(12):1458-68. doi: 10.1093/gerona/glt044. Epub 2013 May 13. PMID: 23671289; PMCID: PMC3814239.
 
 ## Author
 
@@ -182,7 +182,3 @@ If you use this software in your research, please cite:
 - Developed for NMJ morphology analysis
 - Last updated: June 2019 (v3.0)
 - Code review and improvements: November 2025
-
-## License
-
-*[Add license information]*
