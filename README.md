@@ -32,14 +32,30 @@ This toolkit provides a two-stage pipeline for NMJ analysis:
 
 ### Stage 2: Quantitative Measurement
 
+**Full NMJ Analysis (terminal + endplate):**
 ```
 1. Run: Plugins > Macros > Run > NMJ_quantitative_measures_v3.0.ijm (or press F10)
 2. Choose whether to manually review thresholds
-3. Select folder containing cropped .tif files
+3. Select folder containing cropped .tif files (2-channel)
 4. Results saved to "Analysis_[timestamp]" folder
 ```
 
+**Endplate-Only Analysis (single channel):**
+```
+1. Run: Plugins > Macros > Run > NMJ_endplate_analysis.ijm (or press F11)
+2. Choose whether to manually review thresholds
+3. Select folder containing endplate .tif files (single-channel or first channel used)
+4. Results saved to "Endplate_Analysis_[timestamp]" folder
+```
+
+Use endplate-only analysis when you have:
+- Images with only pre-synaptic endplate staining
+- Need only area and dispersion measurements
+- Faster processing (skips terminal and overlap calculations)
+
 ## Measurements Performed
+
+### Full NMJ Analysis (v3.0)
 
 | Measurement | Description |
 |------------|-------------|
@@ -52,6 +68,14 @@ This toolkit provides a two-stage pipeline for NMJ analysis:
 | **efDispRatio** | En face dispersion ratio (convex hull / stained area) |
 | **frag** | Number of discrete endplate fragments |
 | **fragvol** | Volume of each fragment (μm³) |
+
+### Endplate-Only Analysis
+
+| Measurement | Description |
+|------------|-------------|
+| **xRot, yRot** | Rotation angles for maximum en face projection |
+| **endplateArea** | En face area of endplate (μm²) |
+| **efDispRatio** | En face dispersion ratio (convex hull / stained area) |
 
 ## Requirements
 
@@ -92,7 +116,8 @@ nmj-image-analysis/
 ├── NMJ_cropping.ijm                          # Single image cropping
 ├── NMJ_cropping-folder.ijm                   # Batch cropping (basic)
 ├── NMJ_cropping-folder-subStackSelect.ijm    # Batch cropping with substack selection ⭐
-├── NMJ_quantitative_measures_v3.0.ijm        # Latest analysis macro ⭐
+├── NMJ_quantitative_measures_v3.0.ijm        # Full NMJ analysis (terminal + endplate) ⭐
+├── NMJ_endplate_analysis.ijm                 # Endplate-only analysis (single channel) ⭐
 ├── archive/                                   # Older versions (not for production use)
 │   ├── NMJ_quantitative_measures_v2.6.ijm
 │   ├── NMJ_quantitative_measures_v2.6.1.ijm
