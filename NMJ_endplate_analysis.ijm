@@ -2,7 +2,7 @@
 
 /**
  * This ImageJ macro automatically measures the endplate area and dispersion
- * from single-channel images containing only pre-synaptic endplate staining.
+ * from single-channel images containing only endplate staining.
  *
  * This is a simplified version of the full NMJ analysis macro for use when
  * only endplate measurements are needed.
