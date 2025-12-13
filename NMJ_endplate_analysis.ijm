@@ -104,19 +104,16 @@ macro "NMJ Endplate Analysis [f11]" {
       open(currfile);
 
       //if multi-channel, extract first channel
-      if(nSlices > 1) {
-        getDimensions(width, height, channels, slices, frames);
-        if(channels > 1) {
-          run("Split Channels");
-          selectImage(1);
-          //close other channels
-          for(c=2; c<=channels; c++) {
-            selectImage(c);
-            close();
-          }
-          selectImage(1);
+      getDimensions(width, height, channels, slices, frames);
+      if(channels > 1) {
+        run("Split Channels");
+        selectImage(1);
+        //close other channels
+        for(c=2; c<=channels; c++) {
+          selectImage(c);
+          close();
         }
-      }
+        selectImage(1);
 
       endplate = getImageID();
 
