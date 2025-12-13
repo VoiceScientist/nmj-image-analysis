@@ -49,7 +49,7 @@ This toolkit provides a two-stage pipeline for NMJ analysis:
 ```
 
 Use endplate-only analysis when you have:
-- Images with only pre-synaptic endplate staining
+- Images with only endplate staining
 - Need only area and dispersion measurements
 - Faster processing (skips terminal and overlap calculations)
 
