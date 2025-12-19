@@ -49,6 +49,7 @@ n = roiManager("count");
       roiManager("select", i);
       run("Duplicate...", "duplicate");
 	  setBackgroundColor(0, 0, 0);
+	  run("Restore Selection");
 	  run("Clear Outside", "stack");
 	  imageNum = i+1;
 	  saveAs("tiff", saveDir + File.separator + filename + "-" + imageNum);
