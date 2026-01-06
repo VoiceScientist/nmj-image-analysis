@@ -114,6 +114,7 @@ macro "NMJ Endplate Analysis [f11]" {
           close();
         }
         selectImage(1);
+      }
 
       endplate = getImageID();
 
